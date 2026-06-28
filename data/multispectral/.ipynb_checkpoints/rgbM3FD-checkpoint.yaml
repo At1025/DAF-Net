@@ -1,0 +1,8 @@
+path: /data/data/M3FD_Detection
+train_rgb: /data/data/M3FD_Detection/visible/train
+val_rgb: /data/data/M3FD_Detection/visible/test
+# number of classes
+nc: 6
+
+# class names
+names: ['People', 'Car', 'Bus', 'Lamp', 'Motorcycle', 'Truck']
