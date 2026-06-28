@@ -627,13 +627,12 @@ class SE_Block(nn.Module):
         return x * y.expand_as(x)
 
 
-# 通道注意力模块
 class Channel_Attention(nn.Module):
     def __init__(self, in_channels, reduction_ratio=16, pool_types=['avg', 'max']):
         '''
-        :param in_channels: 输入通道数
-        :param reduction_ratio: 输出通道数量的缩放系数
-        :param pool_types: 池化类型
+        :param in_channels: 
+        :param reduction_ratio: 
+        :param pool_types: 
         '''
 
         super(Channel_Attention, self).__init__()
@@ -665,7 +664,6 @@ class Channel_Attention(nn.Module):
         return x * output
 
 
-# 空间注意力模块
 class Spatial_Attention(nn.Module):
     def __init__(self, kernel_size=7):
         super(Spatial_Attention, self).__init__()
@@ -678,11 +676,11 @@ class Spatial_Attention(nn.Module):
 
     def forward(self, x):
         x_compress = torch.cat((torch.max(x, 1)[0].unsqueeze(1), torch.mean(x, 1).unsqueeze(1)),
-                               dim=1)  # 在通道维度上分别计算平均值和最大值，并在通道维度上进行拼接
-        x_output = self.spatial_attention(x_compress)  # 使用7x7卷积核进行卷积
+                               dim=1)  
+        x_output = self.spatial_attention(x_compress)  
         scaled = nn.Sigmoid()(x_output)
 
-        return x * scaled  # 将输入F'和通道注意力模块的输出Ms相乘，得到F''
+        return x * scaled  
 
 
 class CBAM(nn.Module):
@@ -861,9 +859,9 @@ def channel_shuffle(x, groups):
     return x
 
 # Local Feature Enhancement Module (LFEM)
-class LFEM(nn.Module):
+class CGLA(nn.Module):
     def __init__(self, in_channels):
-        super(LFEM, self).__init__()
+        super(CGLA, self).__init__()
 
         self.CBSk1 = Conv(in_channels, in_channels, 1, 1)
         self.CBSk1 = Conv(in_channels, in_channels, 1, 1)
@@ -1000,10 +998,9 @@ class LearnableCoefficient(nn.Module):
         out = x * self.bias
         return out
 
-# Frequency Domain Feed-Forward Layer
-class FDFFN(nn.Module):
+class FEFN(nn.Module):
     def __init__(self, dim, expansion=3, bias=False):
-        super(FDFFN, self).__init__()
+        super(FEFN, self).__init__()
 
         hidden = int(dim * expansion)
 
@@ -1024,31 +1021,27 @@ class FDFFN(nn.Module):
     def forward(self, x):
         x = self.project_in(x)
 
-        # ===== Spatial =====
         x_spatial = self.act(self.dwconv3(x))
 
-        # ===== Frequency（真正有效增强）=====
         x_freq = self.act(self.dwconv5(x))
 
         fft = torch.fft.rfft2(x_freq.float())
 
-        # 软频域增强（避免信息损失）
         mag = torch.abs(fft)
         fft = fft * torch.sigmoid(mag)
 
         x_freq = torch.fft.irfft2(fft, s=(x_freq.shape[2], x_freq.shape[3]))
 
-        # ===== Fusion =====
         out = x_spatial + x_freq
 
         out = self.project_out(out)
 
         return out
         
-# Multimodal Frequency Domain Attention
-class FDCA(nn.Module):
+
+class FCA(nn.Module):
     def __init__(self, dim, bias=False):
-        super(FDCA, self).__init__()
+        super(FCA, self).__init__()
 
         self.norm = LayerNorm(dim, 'WithBias')
 
@@ -1070,29 +1063,25 @@ class FDCA(nn.Module):
         rgb_q, _, rgb_v = rgb_qkv.chunk(3, dim=1)
         ir_q,  _, ir_v  = ir_qkv.chunk(3, dim=1)
 
-        # ===== FFT =====
         rgb_fft = torch.fft.rfft2(rgb_q.float())
         ir_fft  = torch.fft.rfft2(ir_q.float())
 
-        # ===== 频域增强（无差异建模）=====
         rgb_mag = torch.abs(rgb_fft)
         rgb_phase = torch.angle(rgb_fft)
 
         ir_mag = torch.abs(ir_fft)
         ir_phase = torch.angle(ir_fft)
 
-        # soft enhancement（关键）
+        # soft enhancement
         rgb_mag = rgb_mag * torch.sigmoid(rgb_mag)
         ir_mag  = ir_mag  * torch.sigmoid(ir_mag)
 
         rgb_fft = torch.polar(rgb_mag, rgb_phase)
         ir_fft  = torch.polar(ir_mag, ir_phase)
 
-        # ===== IFFT =====
         rgb_out = torch.fft.irfft2(rgb_fft, s=(rgb_q.shape[2], rgb_q.shape[3]))
         ir_out  = torch.fft.irfft2(ir_fft,  s=(ir_q.shape[2], ir_q.shape[3]))
 
-        # ===== modulation =====
         rgb_out = rgb_v * rgb_out
         ir_out  = ir_v  * ir_out
 
@@ -1101,48 +1090,40 @@ class FDCA(nn.Module):
 
         return rgb_out, ir_out
         
-# Frequency Domain Feature Aggregation Module (FDFAM)
-class FDFTM(nn.Module):
+class FCFM(nn.Module):
     def __init__(self, dim):
-        super(FDFTM, self).__init__()
+        super(FCFM, self).__init__()
 
-        self.attn = FDCA(dim)
+        self.attn = FCA(dim)
         self.norm = LayerNorm(dim, 'WithBias')
-        self.ffn  = FDFFN(dim)
+        self.ffn  = FEFN(dim)
 
-        # gated fusion
         self.gate = nn.Conv2d(dim * 2, dim, 1, bias=False)
         self.sigmoid = nn.Sigmoid()
 
-        # residual balance（防止模态塌缩）
         self.balance = nn.Parameter(torch.tensor(0.5))
 
     def forward(self, x):
         rgb, ir = x
 
-        # ===== FDCA =====
         rgb_att, ir_att = self.attn([rgb, ir])
 
         rgb = rgb + rgb_att
         ir  = ir  + ir_att
 
-        # ===== FFN =====
         rgb = rgb + self.ffn(self.norm(rgb))
         ir  = ir  + self.ffn(self.norm(ir))
 
-        # ===== Gated Fusion =====
         fusion = torch.cat([rgb, ir], dim=1)
         w = self.sigmoid(self.gate(fusion))
 
         out = w * rgb + (1 - w) * ir
 
-        # ===== Residual Protection（关键）=====
         balance = torch.sigmoid(self.balance)
         out = out + balance * (rgb + ir) * 0.5
 
         return out
         
-# Cross-Modal Dual-Branch Fusion Block (Optimized CMDFB)
 class CMDFB(nn.Module):
     def __init__(self, in_channels, reduction=16):
         super(CMDFB, self).__init__()
@@ -1211,86 +1192,3 @@ class CMDFB(nn.Module):
 
         return [rgb_final, ir_final]
         
-class NLFEM(nn.Module):
-    def __init__(self, in_channels):
-        super(NLFEM, self).__init__()
-        self.conv = nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=1)
-        self.key = Conv(in_channels, 1, 1, 1)
-        self.value = Conv(in_channels, in_channels, 1, 1)
-        self.convb = nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=1, bias=False)
-        self.conv_half = Conv(2, 1, 1, 1)
-
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)  # GAP
-        self.max_pool = nn.AdaptiveMaxPool2d(1)  # GMP
-        self.layernorm = nn.LayerNorm([in_channels, 1, 1])
-
-    def forward(self, x):
-        rgb_fea = x[0]
-        ir_fea = x[1]
-        #print('in NLFEM rgb_fea shape: ', rgb_fea.shape)
-        #print('in NLFEM ir_fea shape: ', ir_fea.shape)
-
-        N, C, H, W = rgb_fea.shape
-        rgb_fea_conv = self.conv(rgb_fea)
-        ir_fea_conv = self.conv(ir_fea)
-        # RGB
-        # avg max: [N, 1, 1, C]
-        rgb_avg = self.avg_pool(rgb_fea_conv).softmax(1).contiguous().view(N, 1, 1, C)
-        rgb_max = self.max_pool(rgb_fea_conv).softmax(1).contiguous().view(N, 1, 1, C)
-
-        # key: [N, 1, HW, 1]
-        rgb_key = self.key(rgb_fea).contiguous().view(N, 1, -1, 1).softmax(2)
-
-        # value: [N, 1, C, HW]
-        rgb_value = self.value(rgb_fea).contiguous().view(N, 1, C, -1)
-
-        # IR
-        # avg max: [N, 1, 1, C]
-        ir_avg = self.avg_pool(ir_fea_conv).softmax(1).contiguous().view(N, 1, 1, C)
-        ir_max = self.max_pool(ir_fea_conv).softmax(1).contiguous().view(N, 1, 1, C)
-
-        # key: [N, 1, HW, 1]
-        ir_key = self.key(ir_fea).contiguous().view(N, 1, -1, 1).softmax(2)
-
-        # value: [N, 1, C, HW]
-        ir_value = self.value(ir_fea).contiguous().view(N, 1, C, -1)
-
-        # RGB
-        # [N, C, 1, 1]
-        rgb_fea_ = torch.matmul(ir_value, rgb_key).contiguous().view(N, C, 1, 1)
-
-        # [N, 1, H, W]
-        rgb_fea_avg = torch.matmul(rgb_avg, ir_value).contiguous().view(N, 1, H, W)
-        rgb_fea_max = torch.matmul(rgb_max, ir_value).contiguous().view(N, 1, H, W)
-
-        # [N, 2, H, W]
-        rgb_fea_cat = torch.cat([rgb_fea_avg, rgb_fea_max], 1)
-
-        # [N, C, H, W]
-        out_rgb_fea = self.layernorm(self.convb(rgb_fea_)).sigmoid() * self.conv_half(rgb_fea_cat)
-
-        # IR
-        # [N, C, 1, 1]
-        ir_fea_ = torch.matmul(rgb_value, ir_key).contiguous().view(N, C, 1, 1)
-
-        # [N, 1, H, W]
-        ir_fea_avg = torch.matmul(ir_avg, rgb_value).contiguous().view(N, 1, H, W)
-        ir_fea_max = torch.matmul(ir_max, rgb_value).contiguous().view(N, 1, H, W)
-
-        # [N, 2, H, W]
-        ir_fea_cat = torch.cat([ir_fea_avg, ir_fea_max], 1)
-        out_ir_fea = self.layernorm(self.convb(ir_fea_)).sigmoid() * self.conv_half(ir_fea_cat)
-
-        out_rgb = out_rgb_fea + rgb_fea
-        out_ir = out_ir_fea + ir_fea
-
-        return [out_rgb, out_ir]
-
-
-#########################################3
-def to_3d(x):
-    return rearrange(x, 'b c h w -> b (h w) c')
-
-
-def to_4d(x, h, w):
-    return rearrange(x, 'b (h w) c -> b c h w', h=h, w=w)

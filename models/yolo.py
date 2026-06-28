@@ -237,9 +237,9 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
             Bottleneck,
             C3,
             SPPF,
-            LFEM,
+            CGLA,
             CMDFB,
-            FDFTM
+            FCFM
         ]:
                 args.insert(2, n)  # number of repeats
                 n = 1
@@ -252,12 +252,6 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
         elif m is Add2:
             c2 = ch[f[0]]
             args = [c2, args[1]]
-        # elif m is CMAFF:
-        #     c2 = ch[f[0]]
-        #     args = [c2]
-        # elif m is GPT:
-        #     c2 = ch[f[0]]
-        #     args = [c2]
         elif m is Concat:
             c2 = sum([ch[x] for x in f])
         elif m is Detect:

@@ -500,8 +500,8 @@ def train_rgb_ir(hyp, opt, device, tb_writer=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default='FreDFT_LLVIP.pt', help='initial weights path')
-    parser.add_argument('--cfg', type=str, default='./models/transformer/yolov5l_FDFT_LLVIP.yaml', help='model.yaml path')
+    parser.add_argument('--weights', type=str, default='', help='initial weights path')
+    parser.add_argument('--cfg', type=str, default='./models/transformer/yolov5l_caf_LLVIP.yaml', help='model.yaml path')
     parser.add_argument('--data', type=str, default='./data/multispectral/LLVIP.yaml', help='data.yaml path')
     parser.add_argument('--hyp', type=str, default='data/hyp.scratch.yaml', help='hyperparameters path')
     parser.add_argument('--epochs', type=int, default=60)

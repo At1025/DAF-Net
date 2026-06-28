@@ -35,17 +35,17 @@ backbone:
    [-1, 3, C3, [1024]],
    [-1, 1, SPPF, [1024, 5]],  # 19
 
-   [[4,14], 1, LFEM, [256]],    # 20 two stream fuse
-   [[6,16], 1, LFEM, [512]],    # 21 two stream fuse
-   [[9,19], 1, LFEM, [1024]],    # 22 two stream fuse
+   [[4,14], 1, CGLA, [256]],    # 20 two stream fuse
+   [[6,16], 1, CGLA, [512]],    # 21 two stream fuse
+   [[9,19], 1, CGLA, [1024]],    # 22 two stream fuse
 
    [20, 1, CMDFB, [256]],   # 23-P3/8 fusion backbone P3
    [21, 1, CMDFB, [512]],   # 24-P4/16 fusion backbone P4
    [22, 1, CMDFB, [1024]],   # 25-P5/32 fusion backbone P5
 
-   [23, 1, FDFTM, [256]],   # 26-P3/8 fusion backbone P3
-   [24, 1, FDFTM, [512]],   # 27-P4/16 fusion backbone P4
-   [25, 1, FDFTM, [1024]],   # 28-P5/32 fusion backbone P5
+   [23, 1, FCFM, [256]],   # 26-P3/8 fusion backbone P3
+   [24, 1, FCFM, [512]],   # 27-P4/16 fusion backbone P4
+   [25, 1, FCFM, [1024]],   # 28-P5/32 fusion backbone P5
   ]
 
 
