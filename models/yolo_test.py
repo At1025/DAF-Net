@@ -137,9 +137,9 @@ class Model(nn.Module):
             return self.forward_once(x, x2, profile)  # single-scale inference, train
 
     def forward_once(self, x, x2, profile=False):
-        self.float()  # 强制将整个模型的权重转为 torch.float32（全精度）
-        x = x.float()  # 强制将RGB图像输入张量转为 torch.float32
-        x2 = x2.float()  # 强制将红外图像输入张量转为 torch.float32
+        self.float()         
+        x = x.float()  
+        x2 = x2.float()
         y, dt = [], []  # outputs
         i = 0
         for m in self.model:
@@ -297,24 +297,19 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
             args = [c1, c2, *args]
         # elif m is TransformerFusionBlock:
 
-        elif m is LFEM:  # 双输入
+        elif m is CGLA:  
             c2 = ch[f[0]] if isinstance(f, list) else ch[f]
             args = [c2, *args[1:]]
 
-        elif m is NLFEM:
+        elif m is CMDFB:   
             c2 = ch[f[0]] if isinstance(f, list) else ch[f]
             args = [c2, *args[1:]]
         
-        elif m is CMDFB:   # ⭐你现在用到了，一定要加
-            c2 = ch[f[0]] if isinstance(f, list) else ch[f]
-            args = [c2, *args[1:]]
-        
-        elif m is FDFTM:   # 单输入（融合后）
+        elif m is FCFM:   
             c2 = ch[f[0]] if isinstance(f, list) else ch[f]
             args = [c2, *args[1:]]
         
         else:
-            # ⭐通用兜底（关键修复点）
             c2 = ch[f[0]] if isinstance(f, list) else ch[f]
         m_ = nn.Sequential(*[m(*args) for _ in range(n)]) if n > 1 else m(*args)  # module
         t = str(m)[8:-2].replace('__main__.', '')  # module type
